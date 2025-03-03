@@ -1,9 +1,9 @@
 import pandas as pd
 from datetime import datetime
 import os
+import re
 
 def generate_task_report_by_time_range(file_path, start_date, end_date):
-    """Generates a task report grouped by time range."""
     try:
         data = pd.read_csv(file_path)
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -23,7 +23,6 @@ def generate_task_report_by_time_range(file_path, start_date, end_date):
         return None
 
 def generate_monthly_report(file_path):
-    """Generates a report of total time spent per month."""
     try:
         data = pd.read_csv(file_path)
         data['Start Time'] = pd.to_datetime(data['Start Time'], errors='coerce', format='ISO8601')
@@ -41,28 +40,44 @@ def generate_monthly_report(file_path):
         return None
 
 def main():
-    input_file = input("Enter the path to the exported CSV file from furtherance: ").strip()
-    start_date = input("Enter the start date (YYYY-MM-DD): ").strip()
-    end_date = input("Enter the end date (YYYY-MM-DD): ").strip()
-    base_name, extension = os.path.splitext(input_file)
-    task_output_file = f"{base_name}-by-task{extension}"
+    while True:
+        input_file = input("Enter the path to the exported CSV file from furtherance: ").strip()
+        if os.path.exists(input_file):
+            break
+        else:
+            print("File not found. Please enter a valid file path.")
+    date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+    while True:
+        start_date = input("Enter the start date (YYYY-MM-DD): ").strip()
+        if re.match(date_pattern, start_date):
+            break
+        else:
+            print("Invalid date format. Please use YYYY-MM-DD.")
+    while True:
+        end_date = input("Enter the end date (YYYY-MM-DD): ").strip()
+        if re.match(date_pattern, end_date):
+            try:
+                if datetime.strptime(start_date, "%Y-%m-%d").date() <= datetime.strptime(end_date, "%Y-%m-%d").date():
+                    break
+                else:
+                    print("End date must be after or equal to the start date.")
+            except:
+                print("invalid date")
+        else:
+            print("Invalid date format. Please use YYYY-MM-DD.")
     task_report = generate_task_report_by_time_range(input_file, start_date, end_date)
-    if task_report is not None:
-        print("Task Report:")
-        print(task_report)
-        task_report.to_csv(task_output_file, index=False)
-        print(f"Task report saved to {task_output_file}")
-    else:
-        print("Error generating task report.")
-    monthly_output_file = f"{base_name}-monthly{extension}"
     monthly_report = generate_monthly_report(input_file)
-    if monthly_report is not None:
-        print("\nMonthly Report:")
-        print(monthly_report)
-        monthly_report.to_csv(monthly_output_file, index=False)
-        print(f"Monthly report saved to {monthly_output_file}")
+    if task_report is not None and monthly_report is not None:
+        try:
+            with pd.ExcelWriter(f"{start_date}-report.xlsx") as writer:
+                month_name = datetime.strptime(start_date, "%Y-%m-%d").strftime("%m - %B")
+                task_report.to_excel(writer, sheet_name=month_name, index=False)
+                monthly_report.to_excel(writer, sheet_name="General report", index=False)
+            print(f"Reports saved to {start_date}-report.xlsx")
+        except Exception as e:
+            print(f"Error saving to Excel: {e}")
     else:
-        print("Error generating monthly report.")
+        print("Error generating reports.")
 
 if __name__ == "__main__":
     main()
