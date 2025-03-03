@@ -30,7 +30,19 @@ def generate_monthly_report(file_path):
         data['Total Time (seconds)'] = pd.to_timedelta(data['Total Time']).dt.total_seconds()
         monthly_totals = data.groupby('YearMonth')['Total Time (seconds)'].sum().reset_index()
         monthly_totals['Total Time (hours)'] = monthly_totals['Total Time (seconds)'] / 3600
+        monthly_totals['Expected'] = 126
+        monthly_totals['Difference'] = monthly_totals['Total Time (hours)'] - monthly_totals['Expected']
         monthly_totals = monthly_totals.drop(columns=['Total Time (seconds)'])
+
+        total_row = pd.DataFrame({
+            'YearMonth': ['Total'],
+            'Total Time (hours)': [monthly_totals['Total Time (hours)'].sum()],
+            'Expected': [monthly_totals['Expected'].sum()],
+            'Difference': [monthly_totals['Difference'].sum()]
+        })
+
+        monthly_totals = pd.concat([monthly_totals, total_row], ignore_index=True)
+
         return monthly_totals
     except FileNotFoundError:
         print(f"Error: File not found.")
@@ -40,19 +52,23 @@ def generate_monthly_report(file_path):
         return None
 
 def main():
+    input_file = None
     while True:
         input_file = input("Enter the path to the exported CSV file from furtherance: ").strip()
         if os.path.exists(input_file):
             break
         else:
             print("File not found. Please enter a valid file path.")
+
     date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+
     while True:
         start_date = input("Enter the start date (YYYY-MM-DD): ").strip()
         if re.match(date_pattern, start_date):
             break
         else:
             print("Invalid date format. Please use YYYY-MM-DD.")
+
     while True:
         end_date = input("Enter the end date (YYYY-MM-DD): ").strip()
         if re.match(date_pattern, end_date):
@@ -65,8 +81,10 @@ def main():
                 print("invalid date")
         else:
             print("Invalid date format. Please use YYYY-MM-DD.")
+
     task_report = generate_task_report_by_time_range(input_file, start_date, end_date)
     monthly_report = generate_monthly_report(input_file)
+
     if task_report is not None and monthly_report is not None:
         try:
             with pd.ExcelWriter(f"{start_date}-report.xlsx") as writer:
